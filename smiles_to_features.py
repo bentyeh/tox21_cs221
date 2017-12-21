@@ -1,6 +1,6 @@
 import pubchempy as pcp
 import pandas as pd
-import os, argparse, errno
+import os, argparse, errno, time
 # import util
 
 def get_compound_from_smiles(smiles, attempts=5, delay=1):
