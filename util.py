@@ -18,8 +18,8 @@ def get_data_filenames(data_dir, data_file_ext, assay_name):
     '''
     Returns dictionary mapping 'train', 'test', and 'score' to the corresponding data filename
     '''
-    return {subfolder: os.path.join(os.getcwd(), data_dir, subfolder, '') + assay_name + '.' + data_file_ext \
-            for subfolder in ['train', 'test', 'score']}
+    return {subfolder: os.path.join('.', data_dir, subfolder, '') +
+        assay_name + '.' + data_file_ext for subfolder in ['train', 'test', 'score']}
 
 def read_features(filename, header=0, sep='\t'):
     '''

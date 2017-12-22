@@ -43,7 +43,7 @@ def plot_metrics(results, metrics, datasets, results_file_base):
         plt.legend()
         plt.savefig(results_file_base + '_' + metric + '.png')
 
-def plot_ROC(X, Y, model, results, datasets, results_file_base, sess=None):
+def plot_ROC(X, Y, model, results, datasets, results_file_base):
     '''
     Plot receiver operating characteristic curve on specified datasets
     Saves figure to specified path
@@ -57,23 +57,12 @@ def plot_ROC(X, Y, model, results, datasets, results_file_base, sess=None):
     - results: dict, str -> dict
     - metrics: list of str
     - datasets: list of str
-    - results_path: str
+    - results_file_base: str
     '''
 
-    if sess == None:
-        sess = tf.InteractiveSession()
-        sess.run(tf.global_variables_initializer())
-        sess.run(tf.local_variables_initializer()) # necessary for auc calculation
-
-    # KNOWN ISSUES
-    # - not sure how to plot ROC corresponding to best weights - restore weights ??
-    # - auroc calculated by scikit-learn seems to be different from tensorflow
-    index = np.argmax(results['auroc']['test'])
     plt.figure()
     for dataset in datasets:
-        # y_prob = sess.run(model.y_prob, feed_dict={model.x: X[dataset]})
-        # fpr, tpr, _ = sk.metrics.roc_curve(Y[dataset], y_prob)
-        fpr, tpr, _ = sk.metrics.roc_curve(Y[dataset], results['y_prob'][dataset][index])
+        fpr, tpr, _ = sk.metrics.roc_curve(Y[dataset], results['y_prob'][dataset])
         auroc = sk.metrics.auc(fpr, tpr)
         plt.plot(fpr, tpr, label=dataset.title() + ' AUC = ' + str(round(auroc, 3)))
     plt.xlabel('False positive rate')
@@ -82,21 +71,7 @@ def plot_ROC(X, Y, model, results, datasets, results_file_base, sess=None):
     plt.legend()
     plt.savefig(results_file_base + '_AUROC.png')
 
-    index_sk = np.argmax(results['auroc_sk']['test'])
-    plt.figure()
-    for dataset in datasets:
-        # y_prob = sess.run(model.y_prob, feed_dict={model.x: X[dataset]})
-        # fpr, tpr, _ = sk.metrics.roc_curve(Y[dataset], y_prob)
-        fpr, tpr, _ = sk.metrics.roc_curve(Y[dataset], results['y_prob'][dataset][index])
-        auroc = sk.metrics.auc(fpr, tpr)
-        plt.plot(fpr, tpr, label=dataset.title() + ' AUC = ' + str(round(auroc, 3)))
-    plt.xlabel('False positive rate')
-    plt.ylabel('True positive rate')
-    plt.title('ROC curve')
-    plt.legend()
-    plt.savefig(results_file_base + '_AUROC2.png')
-
-def evaluate_model(X, Y, model, q, results, datasets, sess=None):
+def evaluate_model(X, Y, model, q, results, datasets, sess):
     '''
     Arguments
     - model
@@ -114,24 +89,24 @@ def evaluate_model(X, Y, model, q, results, datasets, sess=None):
     - No return value. Appends new data to results
     '''
 
-    if sess == None:
-        sess = tf.InteractiveSession()
-        sess.run(tf.global_variables_initializer())
-        sess.run(tf.local_variables_initializer()) # necessary for auc calculation
-
     for dataset in datasets:
-        loss, acc, y_prob = sess.run([model.loss_fn, model.acc_fn, model.y_prob], feed_dict={model.x: X[dataset], model.y_labels: Y[dataset], model.q: q})
+        loss, acc = sess.run([model.loss_fn, model.acc_fn], feed_dict={model.x: X[dataset], model.y_labels: Y[dataset], model.q: q})
 
-        # auroc calculated by scikit-learn seems to be different from tensorflow
+        ## AUROC
+        
+        # tensorflow method
         auroc = sess.run(model.auroc_fn, feed_dict={model.x: X[dataset], model.y_labels: Y[dataset]})
+        
+        # scikit-learm method
+        y_prob = sess.run(model.y_prob, feed_dict={model.x: X[dataset]})
         fpr, tpr, _ = sk.metrics.roc_curve(Y[dataset], y_prob)
         auroc_sk = sk.metrics.auc(fpr, tpr)
 
+        # append results
         results['loss'][dataset].append(loss)
         results['acc'][dataset].append(acc)
         results['auroc'][dataset].append(auroc)
         results['auroc_sk'][dataset].append(auroc_sk)
-        results['y_prob'][dataset].append(y_prob)
 
 def save_results(X, results, params, results_file_base, metrics, datasets, eval_metric, eval_dataset):
     '''
@@ -155,7 +130,7 @@ def save_results(X, results, params, results_file_base, metrics, datasets, eval_
     df = df.T
     df.to_csv(results_filename, index=False)
 
-def saliency(X, Y, model, sess=None):
+def saliency(X, Y, model, sess):
     '''
     Compute the saliency map.
 
@@ -167,11 +142,6 @@ def saliency(X, Y, model, sess=None):
 
     Source: https://azure.github.io/learnAnalytics-DeepLearning-Azure/saliency-maps.html
     '''
-
-    if sess == None:
-        sess = tf.InteractiveSession()
-        sess.run(tf.global_variables_initializer())
-        sess.run(tf.local_variables_initializer()) # necessary for auc calculation
 
     # Compute the score of the correct class for each example.
     # This gives a Tensor with shape [N], the number of examples.
@@ -273,96 +243,108 @@ def train(X, Y, params, results_file_base, eval_metric, eval_dataset):
     model = models.DNN(num_features, node_array, kernel_reg_const, rand_seed)
 
     # initialize tensorflow graph
-    sess = tf.InteractiveSession()
-    np.random.seed(rand_seed)
-    tf.set_random_seed(rand_seed)
-    sess.run(tf.global_variables_initializer())
-    sess.run(tf.local_variables_initializer()) # necessary for auc calculation: https://stackoverflow.com/questions/44422508/tensorflow-attempting-to-use-uninitialized-value-auc-auc-auc-false-positives
+    with tf.Session() as sess:
+        np.random.seed(rand_seed)
+        tf.set_random_seed(rand_seed)
+        sess.run(tf.global_variables_initializer())
+        sess.run(tf.local_variables_initializer()) # necessary for auc calculation: https://stackoverflow.com/questions/44422508/tensorflow-attempting-to-use-uninitialized-value-auc-auc-auc-false-positives
 
-    # calculate frequencies of positives, negatives in training set
-    q = 1
-    if loss_balance:
-        q = Y['train'].shape[0] / np.sum(Y['train'])
-    print('q: %0.3g' % q)
+        # calculate frequencies of positives, negatives in training set
+        q = 1
+        if loss_balance:
+            q = Y['train'].shape[0] / np.sum(Y['train'])
+        print('q: %0.3g' % q)
+        params['q'] = q
 
-    # keep track of loss and accuracy
-    steps = []
-    loss, acc, auroc, auroc_sk, y_prob = {}, {}, {}, {}, {}
-    for res in [loss, acc, auroc, auroc_sk, y_prob]:
-        res['train'] = []
-        res['test'] = []
+        # keep track of loss and accuracy
+        best_step = 0
+        steps = []
+        loss, acc, auroc, auroc_sk, y_prob = {}, {}, {}, {}, {}
+        for res in [loss, acc, auroc, auroc_sk, y_prob]:
+            res['train'] = []
+            res['test'] = []
 
-    results = {
-        'steps': steps,
-        'loss': loss,
-        'acc': acc,
-        'auroc': auroc,
-        'auroc_sk': auroc_sk,
-        'y_prob': y_prob
-    }
-    
-    datasets = ['train','test']
+        results = {
+            'best_step': best_step,
+            'steps': steps,
+            'loss': loss,
+            'acc': acc,
+            'auroc': auroc,
+            'auroc_sk': auroc_sk,
+            'y_prob': y_prob
+        }
+        
+        datasets = ['train','test']
 
-    # evaluate model based on initialized weights
-    step = 0
-    steps.append(step)
-    evaluate_model(X, Y, model, q, results, datasets, sess)
-    
-    if save_weights:
-        weights_filename = results_file_base + '_model_weights.ckpt'
-        saver = tf.train.Saver()
-        saver.save(sess, weights_filename)
+        # evaluate model based on initialized weights
+        step = 0
+        steps.append(step)
+        evaluate_model(X, Y, model, q, results, datasets, sess)
+        
+        if save_weights:
+            weights_filename = results_file_base + '_model_weights.ckpt'
+            saver = tf.train.Saver()
+            saver.save(sess, weights_filename)
 
-    print('(loss, acc, auroc, auroc_sk) - step %d,\t train: (%0.3g, %0.3g, %0.3g, %0.3g),\t test: (%0.3g, %0.3g, %0.3g, %0.3g)' % (
-        step,
-        results['loss']['train'][-1], results['acc']['train'][-1], results['auroc']['train'][-1], results['auroc_sk']['train'][-1],
-        results['loss']['test'][-1], results['acc']['test'][-1], results['auroc']['test'][-1], results['auroc_sk']['test'][-1]
+        print('(loss, acc, auroc, auroc_sk) - step %d,\ttrain: (%0.3g, %0.3g, %0.3g, %0.3g),\ttest: (%0.3g, %0.3g, %0.3g, %0.3g)' % (
+            step,
+            results['loss']['train'][-1], results['acc']['train'][-1], results['auroc']['train'][-1], results['auroc_sk']['train'][-1],
+            results['loss']['test'][-1], results['acc']['test'][-1], results['auroc']['test'][-1], results['auroc_sk']['test'][-1]
+            )
         )
-    )
 
-    # training loop
-    num_examples = X['train'].shape[0]
-    num_batches_per_epoch = int(np.ceil(num_examples / batch_size))
-    print("Number of batches per epoch: %d " % num_batches_per_epoch)
-    
-    for epoch in range(num_epochs):
-        # shuffle indices of training data
-        shuffle_indices = np.arange(num_examples)
-        np.random.shuffle(shuffle_indices)
+        # training loop
+        num_examples = X['train'].shape[0]
+        num_batches_per_epoch = int(np.ceil(num_examples / batch_size))
+        print("Number of batches per epoch: %d " % num_batches_per_epoch)
+        
+        for epoch in range(num_epochs):
+            # shuffle indices of training data
+            shuffle_indices = np.arange(num_examples)
+            np.random.shuffle(shuffle_indices)
 
-        for i in range(num_batches_per_epoch):
-            # get batch
-            batch_indices = shuffle_indices[i*batch_size : (i+1)*batch_size]
-            batch_x = X['train'][batch_indices]
-            batch_y = Y['train'][batch_indices]
+            for i in range(num_batches_per_epoch):
+                # get batch
+                batch_indices = shuffle_indices[i*batch_size : (i+1)*batch_size]
+                batch_x = X['train'][batch_indices]
+                batch_y = Y['train'][batch_indices]
 
-            # train on batch data
-            sess.run(model.train_step, feed_dict={model.x: batch_x, model.y_labels: batch_y, model.q: q})
-            sess.run(model.auroc_fn, feed_dict={model.x: batch_x, model.y_labels: batch_y})
-            step += 1
+                # train on batch data
+                step += 1
+                sess.run(model.train_step, feed_dict={model.x: batch_x, model.y_labels: batch_y, model.q: q})
+                # sess.run(model.auroc_fn, feed_dict={model.x: batch_x, model.y_labels: batch_y})
 
-            # store loss and accuracy
-            if step % res_freq == 0 or epoch == num_epochs-1 and i == num_batches_per_epoch-1:
-                evaluate_model(X, Y, model, q, results, datasets, sess)
-                steps.append(step)
-                print('(loss, acc, auroc, auroc_sk) - step %d,\t train: (%0.3g, %0.3g, %0.3g, %0.3g),\t test: (%0.3g, %0.3g, %0.3g, %0.3g)' % (
-                    step,
-                    results['loss']['train'][-1], results['acc']['train'][-1], results['auroc']['train'][-1], results['auroc_sk']['train'][-1],
-                    results['loss']['test'][-1], results['acc']['test'][-1], results['auroc']['test'][-1], results['auroc_sk']['test'][-1]
+                # store loss and accuracy
+                if step % res_freq == 0 or epoch == num_epochs-1 and i == num_batches_per_epoch-1:
+                    evaluate_model(X, Y, model, q, results, datasets, sess)
+                    steps.append(step)
+                    print('(loss, acc, auroc, auroc_sk) - step %d,\ttrain: (%0.3g, %0.3g, %0.3g, %0.3g),\ttest: (%0.3g, %0.3g, %0.3g, %0.3g)' % (
+                        step,
+                        results['loss']['train'][-1], results['acc']['train'][-1], results['auroc']['train'][-1], results['auroc_sk']['train'][-1],
+                        results['loss']['test'][-1], results['acc']['test'][-1], results['auroc']['test'][-1], results['auroc_sk']['test'][-1]
+                        )
                     )
-                )
 
-                # save variables only if test auroc has increased
-                if save_weights:
-                    if results[eval_metric][eval_dataset][-1] > max(results[eval_metric][eval_dataset]):
+                    # save variables only if eval_metric has improved
+                    if save_weights and results[eval_metric][eval_dataset][-1] > max(results[eval_metric][eval_dataset][:-1]):
+                        print('saving new weights')
+
+                        # save step
+                        results['best_step'] = step
+
+                        # save y_prob
+                        for dataset in datasets:
+                            y_prob = sess.run(model.y_prob, feed_dict={model.x: X[dataset]})
+                            results['y_prob'][dataset] = y_prob
+
+                        # save weights
                         saver.save(sess, weights_filename)
 
-    print(
-        'Best ' + eval_dataset + ' ' + eval_metric + ': %0.3g' \
+    print('Best ' + eval_dataset + ' ' + eval_metric + ': %0.3g' \
         % max(results[eval_metric][eval_dataset])
     )
 
-    return model, sess, results
+    return model, results
 
 def main(params):
     '''
@@ -371,7 +353,7 @@ def main(params):
         Parameters
     '''
 
-    results_path = os.path.join(os.getcwd(), params['results_dir'], params['assay_name'], '')
+    results_path = os.path.join('.', params['results_dir'], params['assay_name'], '')
     results_file_base = results_path + str(params['run_id'])
     if not os.path.exists(results_path):
         try:
@@ -387,19 +369,32 @@ def main(params):
 
     X, Y = get_data(params)
     params['num_features'] = X['train'].shape[1]
-    model, sess, results = train(X, Y, params, results_file_base, eval_metric, eval_dataset)
+    model, results = train(X, Y, params, results_file_base, eval_metric, eval_dataset)
     save_results(X, results, params, results_file_base, metrics, datasets, eval_metric, eval_dataset)
 
     if params['plot']:
         plot_metrics(results, metrics, datasets, results_file_base)
-        plot_ROC(X, Y, model, results, datasets, results_file_base, sess)
+        plot_ROC(X, Y, model, results, datasets, results_file_base)
 
     saliency_vecs = None
     if params['saliency']:
-        saliency_vecs = saliency(X, Y, model, sess)
-        plot_saliency(saliency_vecs, params['num_features'], results_file_base)
+        if params['save_weights']:
+            # restore weights
+            weights_filename = results_file_base + '_model_weights.ckpt'
+            meta_filename = results_file_base + '_model_weights.ckpt.meta'
 
-    return model, sess, results, saliency_vecs
+            with tf.Session() as sess:
+                sess.run(tf.global_variables_initializer())
+                sess.run(tf.local_variables_initializer()) # necessary for auc calculation
+                saver = tf.train.Saver()
+                # saver = tf.train.import_meta_graph(meta_filename)
+                saver.restore(sess, weights_filename)
+                saliency_vecs = saliency(X, Y, model, sess)
+            plot_saliency(saliency_vecs, params['num_features'], results_file_base)
+        else:
+            print('Cannot compute saliency map without saved weights.')
+
+    return model, results, saliency_vecs
 
 if __name__ == '__main__':
 
@@ -408,15 +403,15 @@ if __name__ == '__main__':
     parser.add_argument('--run_id',	type=str, default='', help='run id')
     parser.add_argument('--rand_seed', type=int, default=None, help='graph-level random seed for tensorflow')
     parser.add_argument('--assay_name', type=str, required=True, help='assay name, e.g. nr-ar, sr-are, ...')
-    parser.add_argument('--data_dir', type=str, required=True, help='directory to find train, test, and score data files')
-    parser.add_argument('--data_file_ext', type=str, default='data', help='data file extension, exluduing the period (e.g. ''fp'', ''data'', etc)')
+    parser.add_argument('--data_dir', type=str, default='data_features', help='directory to find train, test, and score data files')
+    parser.add_argument('--data_file_ext', type=str, default='features', help='data file extension, exluduing the period (e.g. ''fp'', ''data'', etc)')
     parser.add_argument('--results_dir', type=str, default='results', help='directory to save results (e.g. ''results'')')
     parser.add_argument('--results_file_ext', type=str, default='results', help='results file extension, exluduing the period (e.g. ''fp'', ''data'', etc)')
     # output options
     parser.add_argument('--res_freq', type=int, default=25, help='how often (per number of SGD batches) to save model evaluation results while training, default = 25')
-    parser.add_argument('--save_weights', type=util.str2bool, default=False, help='save the tensorflow model weights, default = False')
+    parser.add_argument('--save_weights', type=util.str2bool, default=True, help='save the tensorflow model weights, default = True')
     parser.add_argument('--plot', type=util.str2bool, default=False, help='show and save timeplots of accuracy metrics, default = False')
-    parser.add_argument('--saliency', type=util.str2bool, default=True, help='compute saliency map, default = False')
+    parser.add_argument('--saliency', type=util.str2bool, default=False, help='compute saliency map, default = False')
     # hyperparameters
     parser.add_argument('--loss_balance', type=util.str2bool, default=False, help='adjust loss function to account for unbalanced dataset, default = False')
     parser.add_argument('--kernel_reg_const', type=float, default=0.01, help='L2 kernel regularization constant')

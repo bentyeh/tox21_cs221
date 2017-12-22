@@ -127,5 +127,5 @@ class DNN():
         See how to use tf.metrics.auc here:
         https://stackoverflow.com/questions/45808121/why-my-tensorflow-auc-is-0-0
         '''
-        auc, update_op = tf.metrics.auc(self.y_labels, self.y_pred, num_thresholds=10000)
+        auc, update_op = tf.metrics.auc(self.y_labels, self.y_pred)
         return update_op # [auc, update_op]
