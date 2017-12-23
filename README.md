@@ -80,6 +80,8 @@ Example (find and evaluate optimal trained model): `python score.py --assay_name
 * [run_id]: unique integer id assigned to hyperparameter set
 * [results_file_ext]: file extension (excluding the '.') of the results files
 
+Sample results files are included in this repo.
+
 ## PubChem and PubChemPy Notes
 
 ### PubChem
