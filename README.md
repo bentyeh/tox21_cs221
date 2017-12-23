@@ -1,9 +1,60 @@
-Modeling and prediction of drug toxicity from chemical structure
-By Joyce Kang, Rifath Rashid, Benjamin Yeh
+# Modeling and prediction of drug toxicity from chemical structure
 
-# Directory structure
+NIH Tox21 Challenge: https://tripod.nih.gov/tox21/challenge/
 
-## Data
+## Pipeline
+
+### Append labels to test and score datasets: `label_score_data.py`, `label_test_data.py`
+
+The test and score datasets provided by the Tox21 Challenge are unlabeled - the labels are provided separately from the SMILES files. To generate labeled SMILES files matching the training dataset, run `label_score_data.py` and `label_test_data.py`.
+
+The data in data_raw has already been labeled accordingly.
+
+### Feature extraction: `smiles_to_features.py`
+
+Read in SMILES codes and labels (active/inactive) provided by the Tox21 Challenge and output featurized data.
+
+Run `python smiles_to_features.py --help` to learn more about the different arguments
+
+Example: `python smiles_to_features.py --assay_name nr-ahr --smiles_dir data_raw --smiles_file_ext smiles --dataset train --features_dir data_features --features_file_ext features --attempts 15 --delay 1`
+
+Modify the relevant_features list in the code to choose feature set. See PubChem and PubChemPy notes below for more information about available compound properties.
+
+To generate a script to run feature extraction over all datasets, run `python feature_retriever_script_generator.py`
+
+### Tune hyperparameters: `train.py`
+
+Train a (deep) neural net model with specified hyperparameters on the train and test (validation) datasets.
+
+Run `python train.py --help` to learn more about the different arguments
+
+Example: python train.py --run_id 0 --rand_seed 848 --assay_name nr-ahr --res_freq 25 --loss_balance True --kernel_reg_const 0 --batch_size 50 --num_epochs 50 --node_array 512 256 128
+
+To generate a script to test multiple hyperparameters over all datasets, modify `hyperparameter_tuning_script_generator.py` to specify hyperparmeters options and run `python hyperparameter_tuning_script_generator.py`.
+
+### Evaluate a trained model on the score dataset: `score.py`
+
+Evaluate a specific trained model on the score dataset, or find the optimal trained model (from multiple results files) and evaluate that model on the score dataset.
+
+Run `python score.py --help` to learn more about the different arguments
+
+Example (evaluate a specific trained model): python score.py --run_id 0 --assay_name nr-ahr --results_dir results --results_file_ext results --eval_metric auroc_test --saliency True
+
+Example (find and evaluate optimal trained model): python score.py --assay_name nr-ahr --results_dir results --results_file_ext results --eval_metric auroc_test --saliency True
+
+## Key dependencies
+
+* python 3
+* pubchempy 1.0.4
+* tensorflow 1.4
+* numpy 1.13.3
+* pandas 0.21.1
+* scikit-learn 0.19.1
+* matplotlib 2.1.1
+
+## Directory structure
+
+### Data
 [data_dir]/[dataset]/[assay_name].[data_file_ext]
 * [data_dir]: name of data directory
   * data_raw: the original data files downloaded from Tox21 Challenge
@@ -15,72 +66,22 @@ By Joyce Kang, Rifath Rashid, Benjamin Yeh
 * [assay_name]: one of 12 different assays used in the Tox21 Challenge
 * [data_file_ext]: file extension (excluding the '.') of the data files
 
-## Results
+### Results
 [results_dir]/[assay_name]/[run_id].[results_file_ext]
 * [results_dir]: name of results directory
 * [assay_name]: one of 12 different assays used in the Tox21 Challenge
 * [run_id]: unique integer id assigned to hyperparameter set
 * [results_file_ext]: file extension (excluding the '.') of the results files
 
-# Pipeline
+## PubChem and PubChemPy Notes
 
-## Appending labels to test and score datasets
-
-The test and score datasets provided by the Tox21 Challenge are unlabeled - the labels are provided separately from the SMILES files. To generate labeled SMILES files matching the training dataset, run `label_score_data.py` and `label_test_data.py`.
-
-The data in data_raw has already been labeled accordingly.
-
-## Feature extraction
-
-`smiles_to_features.py`. Read in SMILES codes and labels (active/inactive) provided by the Tox21 Challenge and output featurized data.
-
-Run `python smiles_to_features.py --help` to learn more about the different arguments
-
-Example: `python smiles_to_features.py --assay_name nr-ahr --smiles_dir data_raw --smiles_file_ext smiles --dataset train --features_dir data_features --features_file_ext features --attempts 15 --delay 1`
-
-Modify the relevant_features list in the code to choose feature set. See PubChem and PubChemPy notes below for more information about available compound properties.
-
-To generate a script to run feature extraction over all datasets, run `python feature_retriever_script_generator.py`
-
-## Tune hyperparameters
-
-`train.py`. Train a (deep) neural net model with specified hyperparameters on the train and test (validation) datasets.
-
-Run `python train.py --help` to learn more about the different arguments
-
-Example: python train.py --run_id 0 --rand_seed 848 --assay_name nr-ahr --res_freq 25 --loss_balance True --kernel_reg_const 0 --batch_size 50 --num_epochs 50 --node_array 512 256 128
-
-To generate a script to test multiple hyperparameters over all datasets, modify `hyperparameter_tuning_script_generator.py` to specify hyperparmeters options and run `python hyperparameter_tuning_script_generator.py`.
-
-## Evaluate a trained model on the score dataset
-
-`score.py`. Evaluate a specific trained model on the score dataset, or find the optimal trained model (from multiple results files) and evaluate that model on the score dataset.
-
-Run `python score.py --help` to learn more about the different arguments
-
-Example (evaluate a specific trained model): python score.py --run_id 0 --assay_name nr-ahr --results_dir results --results_file_ext results --eval_metric auroc_test --saliency True
-
-Example (find and evaluate optimal trained model): python score.py --assay_name nr-ahr --results_dir results --results_file_ext results --eval_metric auroc_test --saliency True
-
-# Key dependencies
-
-python 3
-pubchempy 1.0.4
-tensorflow 1.4
-numpy 1.13.3
-pandas 0.21.1
-scikit-learn 0.19.1
-matplotlib 2.1.1
-
-# PubChem and PubChemPy Notes
-
-## PubChem
+### PubChem
 * [PubChem Docs](https://pubchemdocs.ncbi.nlm.nih.gov/)
   * [List of available pre-computed compound properties](https://pubchemdocs.ncbi.nlm.nih.gov/pug-rest$_Toc494865567)
     * [List and description of the 881 PubChem fingerprints](ftp://ftp.ncbi.nlm.nih.gov/pubchem/specifications/pubchem_fingerprints.txt)
     * 14 3-D properties (e.g. 'Volume3D') are only available for small, rigid, organic compounds. See [here](https://pubchem.ncbi.nlm.nih.gov/release3d.html)
 
-## PubChemPy
+### PubChemPy
 
 PubChemPy is a Python wrapper for the PUG-REST service to access PubChem. Note that the default time-out on PubChem servers is 30 seconds (see [here](https://pubchemdocs.ncbi.nlm.nih.gov/programmatic-access)). As a result, retrieving compound properties (i.e. features) may result in `Bad HTTP Requests` and other errors. The `smiles_to_features.py` script attempts to mitigate this issue by trying multiple attempts until successful. However, in certain (unclear) cases, the script becomes stuck in an attempt.
 
@@ -95,3 +96,7 @@ A suggested workaround is as follows:
   2. Cancel the current stuck attempt: `Ctrl-C`
   3. Pause the script: `Ctrl-Z`
   4. Background the script and continue running: `bg %[job_id]`
+
+...
+
+A further development of a CS 221 project by Joyce Kang, Rifath Rashid, and Benjamin Yeh: https://github.com/RifathRashid/biological-assay-classification
