@@ -42,15 +42,22 @@ Example (evaluate a specific trained model): `python score.py --run_id 0 --assay
 
 Example (find and evaluate optimal trained model): `python score.py --assay_name nr-ahr --results_dir results --results_file_ext results --eval_metric auroc_test --saliency True`
 
+## Other files
+
+* `models.py`: defines a model class, in this case, a neural network
+* `util.py`: utility functions for reading data
+* `baseline.ipynb`: Jupyter notebook for evaluting basic models in scikit-learn on the datasets
+
 ## Key dependencies
 
 * python 3
 * pubchempy 1.0.4
 * tensorflow 1.4
-* numpy 1.13.3
-* pandas 0.21.1
-* scikit-learn 0.19.1
-* matplotlib 2.1.1
+* numpy 1.13
+* pandas 0.21
+* scikit-learn 0.19
+* matplotlib 2.1
+* jupyter 1.0
 
 ## Directory structure
 
