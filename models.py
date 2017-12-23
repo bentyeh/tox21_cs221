@@ -1,45 +1,62 @@
 import tensorflow as tf
 
 def sign_tf(x, threshold=0):
-    return tf.cast(tf.greater_equal(x, threshold), tf.int32)
-
-def sign(x, threshold=0):
     '''
-    Parameters
-    - x: numpy.ndarray
+    Return a tensorflow operation for evaluating x >= threshold
+
+    Arguments
+    - x: tf.Tensor, shape = arbitrary
     - threshold: scalar, default = 0
 
     Returns
-    - y: numpy.ndarray, dtype = int
-        y[i] = 1 if x[i] > threshold, 0 otherwise
+    - Tensorflor operation
     '''
-    y = x > threshold
-    return y.astype(int)
+    return tf.cast(tf.greater_equal(x, threshold), tf.int32)
 
 class DNN():
 
     def __init__(self, num_features, node_array, kernel_reg_const, rand_seed):
+        '''
+        Arguments
+        - num_features: int
+            Number of features
+        - node_array: numpy.ndarray
+            1-D array of number of nodes in hidden layers
+        - kernel_reg_const: float
+            L2 regularization weight
+        - rand_seed: int or None
+            Seed to for numpy and tensorflow random number generators.
+            Set to None to use random seed
+        '''
+        # Model parameters
         self.num_features = num_features
         self.node_array = node_array
         self.kernel_reg_const = kernel_reg_const
         self.rand_seed = rand_seed
 
-        # define placeholders
-        # x: input
-        # y_labels: labels
-        # q: loss weights for unbalanced data
+        # Placeholders
+        # - x: size = (batch_size, num_features)
+        #       Input layer
+        # - y_labels: size = (batch_size,)
+        #       Labels
+        # - q: scalar
+        #       Loss function weight to account for imbalanced datasets. Relative cost of a positive
+        #       error (incorrect classification of a positive data point) relative to a negative error.
         self.x = tf.placeholder(tf.float32, shape=(None, num_features))
         self.y_labels = tf.placeholder(tf.float32) # domain: {0,1}
         self.q = tf.placeholder(tf.float32)
 
-        # Build the graph for the deep net
+        # y values
+        # - y_logit: real-valued logit of classifying an input data point into the positive class
+        # - y_pred: predicted value: 0 or 1
+        # - y_prob: probability of classifying into positive class
         self.y_logit = self.model()
-        self.loss_fn = self.loss()
-        self.train_step = self.optimizer()
+        self.y_pred = sign_tf(self.y_logit)
+        self.y_prob = self.prob()               
 
-        # Other y values
-        self.y_prob = self.prob()               # probability of classifying into positive class
-        self.y_pred = sign_tf(self.y_logit)     # predicted value: 0 or 1
+        # Build the graph for the deep net
+        self.loss_fn = self.loss()          # must be assigned after self.y_logit
+        self.train_step = self.optimizer()  # must be assigned after self.loss_fn
 
         # Evaluation functions
         self.acc_fn = self.accuracy()
@@ -56,17 +73,9 @@ class DNN():
         Neural network model. Builds the graph for learning the logit.
         The probability of classifying into the positive class = sigmoid(logit)
 
-        Args:
-            x: tf.Tensor. size = (batch_size, num_features)
-                Input layer
-            nodes: numpy.ndarray
-                A list of number of nodes in hidden layers
-            kernel_reg_const: float
-                L2 regularization weight
-
-        Returns:
-            y: a tensor of length batch_size with values equal to the logits
-                of classifying an input data point into the positive class
+        Returns
+        - y: tf.Tensor. shape = (batch_size,)
+            Logits of classifying an input data point into the positive class
         """        
         layers = []
 
@@ -74,7 +83,10 @@ class DNN():
         layers.append(self.x)
         
         # hidden layers
-        num_hidden_layers = min(self.node_array.size, self.node_array[0])
+        num_hidden_layers = 0
+        if self.node_array[0]:
+            # The first element of self.node_array is not 0
+            num_hidden_layers = self.node_array.size
         for i in range(num_hidden_layers):
             layer_hidden = tf.layers.dense(
                 inputs=layers[i],
@@ -127,5 +139,6 @@ class DNN():
         See how to use tf.metrics.auc here:
         https://stackoverflow.com/questions/45808121/why-my-tensorflow-auc-is-0-0
         '''
+        # tensorflow method
         auc, update_op = tf.metrics.auc(self.y_labels, self.y_pred)
-        return update_op # [auc, update_op]
+        return update_op

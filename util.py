@@ -3,34 +3,51 @@ import numpy as np
 
 def sign(x, threshold=0):
     '''
-    Parameters
+    Return True if x >= threshold
+
+    Arguments
     - x: numpy.ndarray
     - threshold: scalar, default = 0
 
     Returns
     - y: numpy.ndarray, dtype = int
-        y[i] = 1 if x[i] > threshold, 0 otherwise
+        y[i] = 1 if x[i] >= threshold, 0 otherwise
     '''
-    y = x > threshold
+    y = x >= threshold
     return y.astype(int)
 
 def get_data_filenames(data_dir, data_file_ext, assay_name):
     '''
-    Returns dictionary mapping 'train', 'test', and 'score' to the corresponding data filename
+    Returns dictionary mapping datasets to corresponding filenames
+
+    Arguments
+    - data_dir: str
+        Directory of train, test, and score data files
+    - data_file_ext: str
+        Data file extension, exluduing the period. Example: 'features'
+    - assay_name: str
+        Assay name. Example: 'nr-ahr'
+
+    Returns
+    - filenames: dict, str (dataset) -> str (filenames)
+        Dictionary mapping 'train', 'test', and 'score' to the corresponding data filename
+        Example: filenames['train']
     '''
     return {subfolder: os.path.join('.', data_dir, subfolder, '') +
         assay_name + '.' + data_file_ext for subfolder in ['train', 'test', 'score']}
 
-def read_features(filename, header=0, sep='\t'):
+def read_features(filename, header=None, sep='\t'):
     '''
-    Parameters
+    Read features data file
+
+    Arguments
     - filename: str
         Data must be arranged as follows:
         cid, ncats_id, smiles code, label, fingerprint, extra features (sep-delimited, same number of features per data point)
-    - header: int, default = 0
+    - header: int, default = None
         Number of lines to ignore.
-        Ex: header = 0 will read the first row as data.
-        Ex: header = 1 will skip the first row (1-indexed) and begin reading data from the second row.
+        Ex: header = None will read the first row as data.
+        Ex: header = 0 will skip the first row (0-indexed) and begin reading data from the second row.
     - sep: str, default = '\t'
         Delimiter. Default is tab-delimited. Set to None to split by whitespace.
 
@@ -45,8 +62,9 @@ def read_features(filename, header=0, sep='\t'):
 
     with open(filename, 'r') as data_file:
         # skip headers
-        for _ in range(header):
-            data_file.readline()
+        if header != None:
+            for _ in range(header+1):
+                data_file.readline()
         
         for index, line in enumerate(data_file):
             split_line = line.strip().split(sep)
@@ -62,7 +80,9 @@ def read_features(filename, header=0, sep='\t'):
 
 def str2bool(v):
     '''
-    Args
+    Convert string to boolean
+
+    Arguments
     - v: str
         String representing boolean value, case agnostic
         Accepted values:
@@ -70,7 +90,7 @@ def str2bool(v):
             False: {'no', 'false', 'f', 'n', '0'}
 
     Returns
-    - boolean corresponding to string argument
+    - Boolean
         Raises type error if string argument is not an accepted value
 
     Source
@@ -83,3 +103,37 @@ def str2bool(v):
         return False
     else:
         raise argparse.ArgumentTypeError('Boolean value expected.')
+
+def command_str(program, params, python_opts='', redir_stdout=False, bg=False):
+    '''
+    Return command to run program with specified options and parameters
+
+    Arguments
+    - program: str
+        Name of program to run
+    - params: dict, str -> various
+        Parameters to pass into the program
+    - python_opts: str, default = ''
+        Python arguments. See https://docs.python.org/3/using/cmdline.html
+        Example: '-u' to force stdout and stderr streams to be unbuffered
+        Example: '-m pdb' to run python debugger (pdb)
+    - redir_stdout: bool, default = False
+        Whether to redirect stdout to a file named [run_id].out
+    - bg: bool, default = False
+        Whether to append the bash command ' &' so that the program is run in the background
+
+    Returns
+    - command: str
+        The command string with specified options and parameters
+    '''
+    command = 'python ' + python_opts + ' ' + program
+    for key in params:
+        command += ' --' + key + ' ' + str(params[key])
+
+    if redir_stdout:
+        command += ' > ' + str(params['run_id']) + '.out'
+
+    if bg:
+        command += ' &'
+
+    return command
