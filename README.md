@@ -28,7 +28,7 @@ Train a (deep) neural net model with specified hyperparameters on the train and 
 
 Run `python train.py --help` to learn more about the different arguments
 
-Example: python train.py --run_id 0 --rand_seed 848 --assay_name nr-ahr --res_freq 25 --loss_balance True --kernel_reg_const 0 --batch_size 50 --num_epochs 50 --node_array 512 256 128
+Example: `python train.py --run_id 0 --rand_seed 848 --assay_name nr-ahr --res_freq 25 --loss_balance True --kernel_reg_const 0 --batch_size 50 --num_epochs 50 --node_array 512 256 128`
 
 To generate a script to test multiple hyperparameters over all datasets, modify `hyperparameter_tuning_script_generator.py` to specify hyperparmeters options and run `python hyperparameter_tuning_script_generator.py`.
 
@@ -38,9 +38,9 @@ Evaluate a specific trained model on the score dataset, or find the optimal trai
 
 Run `python score.py --help` to learn more about the different arguments
 
-Example (evaluate a specific trained model): python score.py --run_id 0 --assay_name nr-ahr --results_dir results --results_file_ext results --eval_metric auroc_test --saliency True
+Example (evaluate a specific trained model): `python score.py --run_id 0 --assay_name nr-ahr --results_dir results --results_file_ext results --eval_metric auroc_test --saliency True`
 
-Example (find and evaluate optimal trained model): python score.py --assay_name nr-ahr --results_dir results --results_file_ext results --eval_metric auroc_test --saliency True
+Example (find and evaluate optimal trained model): `python score.py --assay_name nr-ahr --results_dir results --results_file_ext results --eval_metric auroc_test --saliency True`
 
 ## Key dependencies
 
@@ -92,11 +92,11 @@ A suggested workaround is as follows:
   * The `&` at the end of the command tells bash to run the script in the background.
 * If the script gets stuck (e.g., `tail tmp.out` stops showing progress):
   1. Foreground the job: `fg %[job_id]`
-    * Find the `[job_id]` using the `jobs` program
+      * Find the `[job_id]` using the `jobs` program
   2. Cancel the current stuck attempt: `Ctrl-C`
   3. Pause the script: `Ctrl-Z`
   4. Background the script and continue running: `bg %[job_id]`
 
-...
+______
 
 A further development of a CS 221 project by Joyce Kang, Rifath Rashid, and Benjamin Yeh: https://github.com/RifathRashid/biological-assay-classification
