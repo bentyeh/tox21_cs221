@@ -321,11 +321,25 @@ def train(X, Y, params, results_file_base, eval_metric, eval_dataset):
     node_array = np.array(params['node_array'], dtype=int)
     num_features = params['num_features']
 
+    datasets = ['train','test']
+
     # build model
     model = models.DNN(num_features, node_array, kernel_reg_const, rand_seed)
 
     # initialize tensorflow graph
     with tf.Session() as sess:
+        if params['tensorboard']:
+            merged_summary = {}
+            for dataset in datasets:
+                loss = tf.summary.scalar('loss_' + dataset, model.loss_fn)
+                acc = tf.summary.scalar('acc_' + dataset, model.acc_fn)
+                merged_summary[dataset] = tf.summary.merge([loss, acc])
+
+            # `sess.graph` provides access to the graph used in a `tf.Session`.
+            tb_path = os.path.join('.', params['results_dir'], params['assay_name'], str(params['run_id']) + '_tb', '')
+            params['tensorboard_path'] = tb_path
+            writer = tf.summary.FileWriter(tb_path, sess.graph)
+
         np.random.seed(rand_seed)
         tf.set_random_seed(rand_seed)
         sess.run(tf.global_variables_initializer())
@@ -363,6 +377,12 @@ def train(X, Y, params, results_file_base, eval_metric, eval_dataset):
         steps.append(step)
         evaluate_model(X, Y, model, q, results, datasets, sess)
         
+        if params['tensorboard']:
+            for dataset in datasets:
+                s = sess.run(merged_summary[dataset], feed_dict={model.x: X[dataset], model.y_labels: Y[dataset], model.q: q})
+                writer.add_summary(s, step)
+
+
         params['weights_filename'] = ''
         if save_weights:
             weights_filename = results_file_base + '_model_weights.ckpt'
@@ -410,6 +430,11 @@ def train(X, Y, params, results_file_base, eval_metric, eval_dataset):
                         )
                     )
 
+                    if params['tensorboard']:
+                        for dataset in datasets:
+                            s = sess.run(merged_summary[dataset], feed_dict={model.x: X[dataset], model.y_labels: Y[dataset], model.q: q})
+                            writer.add_summary(s, step)
+
                     # save variables only if eval_metric has improved
                     if save_weights and results[eval_metric][eval_dataset][-1] > max(results[eval_metric][eval_dataset][:-1]):
                         print('saving new weights')
@@ -432,6 +457,9 @@ def train(X, Y, params, results_file_base, eval_metric, eval_dataset):
                             print('Best ' + eval_dataset + ' ' + eval_metric + ': %0.3f' \
                                 % results[eval_metric][eval_dataset][results['best_index']])
                             return model, results
+
+        if params['tensorboard']:
+            writer.close()
 
     print('Maximum training steps reached.')
     print('Best ' + eval_dataset + ' ' + eval_metric + ': %0.3f' \
@@ -524,7 +552,8 @@ if __name__ == '__main__':
     parser.add_argument('--save_weights', type=util.str2bool, default=True, help='save the tensorflow model weights, default = True')
     parser.add_argument('--plot', type=util.str2bool, default=False, help='show and save timeplots of accuracy metrics, default = False')
     parser.add_argument('--saliency', type=util.str2bool, default=False, help='compute saliency map, default = False. requires save_weights to be True')
-    
+    parser.add_argument('--tensorboard', type=util.str2bool, default=False, help='write out summary operations to results_dir/assay_name/run_id_tb/')
+
     # training parameters
     parser.add_argument('--loss_balance', type=util.str2bool, default=False, help='adjust loss function to account for unbalanced dataset, default = False')
     parser.add_argument('--kernel_reg_const', type=float, default=0.01, help='L2 kernel regularization constant')

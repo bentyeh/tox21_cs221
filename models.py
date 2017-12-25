@@ -42,9 +42,9 @@ class DNN():
         # - q: scalar
         #       Loss function weight to account for imbalanced datasets. Relative cost of a positive
         #       error (incorrect classification of a positive data point) relative to a negative error.
-        self.x = tf.placeholder(tf.float32, shape=(None, num_features))
-        self.y_labels = tf.placeholder(tf.float32) # domain: {0,1}
-        self.q = tf.placeholder(tf.float32)
+        self.x = tf.placeholder(tf.float32, shape=(None, num_features), name='x')
+        self.y_labels = tf.placeholder(tf.float32, name='y_labels') # domain: {0,1}
+        self.q = tf.placeholder(tf.float32, name='q')
 
         # y values
         # - y_logit: real-valued logit of classifying an input data point into the positive class
@@ -66,7 +66,7 @@ class DNN():
         '''
         Return the probability of classifying into the positive class
         '''
-        return tf.sigmoid(self.y_logit)
+        return tf.sigmoid(self.y_logit, name='y_prob')
 
     def model(self):
         """
@@ -93,7 +93,8 @@ class DNN():
                 units=self.node_array[i],
                 activation=tf.nn.relu,
                 kernel_regularizer=tf.contrib.layers.l2_regularizer(self.kernel_reg_const),
-                kernel_initializer=tf.glorot_uniform_initializer(seed=None if self.rand_seed == None else i + self.rand_seed)
+                kernel_initializer=tf.glorot_uniform_initializer(seed=None if self.rand_seed == None else i + self.rand_seed),
+                name='dense'+str(i)
             )
             layers.append(layer_hidden)
 
@@ -103,11 +104,12 @@ class DNN():
             units=1,
             activation=None,
             kernel_regularizer=tf.contrib.layers.l2_regularizer(self.kernel_reg_const),
-            kernel_initializer=tf.glorot_uniform_initializer(seed=None if self.rand_seed == None else num_hidden_layers + self.rand_seed)
+            kernel_initializer=tf.glorot_uniform_initializer(seed=None if self.rand_seed == None else num_hidden_layers + self.rand_seed),
+            name='output'
         )
         layers.append(layer_out)
 
-        return tf.squeeze(layers[-1])
+        return tf.squeeze(layers[-1], name='y_logit')
 
     def optimizer(self):
         '''
@@ -121,7 +123,7 @@ class DNN():
         cost of a positive error (incorrect classification of a positive data point) relative to a
         negative error.
         '''
-        return tf.reduce_mean(tf.nn.weighted_cross_entropy_with_logits(targets=self.y_labels, logits=self.y_logit, pos_weight=self.q))
+        return tf.reduce_mean(tf.nn.weighted_cross_entropy_with_logits(targets=self.y_labels, logits=self.y_logit, pos_weight=self.q), name='loss')
 
     def accuracy(self):
         '''
@@ -130,7 +132,7 @@ class DNN():
         '''
         correct_prediction = tf.equal(sign_tf(self.y_logit), tf.cast(self.y_labels, tf.int32))
         correct_prediction = tf.cast(correct_prediction, tf.float32)
-        return tf.reduce_mean(correct_prediction)
+        return tf.reduce_mean(correct_prediction, name='accuracy')
 
     def auroc(self):
         '''

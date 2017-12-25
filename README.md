@@ -28,7 +28,7 @@ Train a (deep) neural net model with specified hyperparameters on the train and 
 
 Run `python train.py --help` to learn more about the different arguments
 
-Example: `python train.py --run_id 0 --rand_seed 848 --assay_name nr-ahr --res_freq 25 --loss_balance True --kernel_reg_const 0 --batch_size 50 --num_epochs 50 --node_array 512 256 128`
+Example: `python train.py --run_id 0 --rand_seed 848 --assay_name nr-ahr --res_freq 25 --plot True --tensorboard True --loss_balance True --kernel_reg_const 0 --batch_size 50 --num_epochs 4 --node_array 256 256 256`
 
 To generate a script to test multiple hyperparameters over all datasets, modify `hyperparameter_tuning_script_generator.py` to specify hyperparmeters options and run `python hyperparameter_tuning_script_generator.py`.
 
@@ -71,7 +71,7 @@ Example (find and evaluate optimal trained model): `python score.py --assay_name
   * test: use to tune hyperparameters
   * score: final evaluation dataset
 * [assay_name]: one of 12 different assays used in the Tox21 Challenge
-* [data_file_ext]: file extension (excluding the '.') of the data files
+* [data_file_ext]: file extension (excluding the period '.') of the data files
 
 ### Results
 [results_dir]/[assay_name]/[run_id].[results_file_ext]
@@ -80,7 +80,17 @@ Example (find and evaluate optimal trained model): `python score.py --assay_name
 * [run_id]: unique integer id assigned to hyperparameter set
 * [results_file_ext]: file extension (excluding the '.') of the results files
 
-Sample results files are included in this repo.
+If Tensorboard is enabled (via the `--tensorboard` argument for `train.py`), event files are written to [results_dir]/[assay_name]/[run_id]_tb/
+
+Sample results files from running the "Example" commands are included in this repo under results/nr-ahr/.
+
+## Known Issues
+
+* AUROC calculation using Tensorflow. The values are different from values calculated using scikit-learn, which is presumably correct.
+
+## Future work
+
+* Modify model to train and evaluate all assay datasets simultaneously. The input would be  the same (a set of featurized compounds data, shape = (num_examples, num_features)), but the output would become a layer of shape (num_assays,) representing the logit of the  classification probabilities for each of the 12 assays.
 
 ## PubChem and PubChemPy Notes
 
@@ -108,4 +118,4 @@ A suggested workaround is as follows:
 
 ______
 
-A further development of a CS 221 project by Joyce Kang, Rifath Rashid, and Benjamin Yeh: https://github.com/RifathRashid/biological-assay-classification
+Built on a CS 221 project by Joyce Kang, Rifath Rashid, and Benjamin Yeh (myself): https://github.com/RifathRashid/biological-assay-classification
